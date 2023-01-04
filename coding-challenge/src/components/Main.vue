@@ -239,7 +239,8 @@
         </v-col>
         <v-col md="10">
           <div v-for="(item, index) in itemsSalesTax" :key="index">
-            <h3 style="font-size: 1rem;margin-top: 1rem;margin-left: 25rem;">{{ "€" + item.priceInclAllTaxes + " : 1 " + item.title}}</h3>
+            <h3 v-if="item.imported===false" style="font-size: 1rem;margin-top: 1rem;margin-left: 25rem;">{{ "€" + item.priceInclAllTaxes + " : 1 " + item.title}}</h3>
+            <h3 v-else style="font-size: 1rem;margin-top: 1rem;margin-left: 25rem;">{{ "€" + item.priceInclAllTaxes + " : 1 imported " + item.title}}</h3>
             <v-divider v-if="index+1 === itemsSalesTax.length" style="background-color: black;"></v-divider>
           </div>
           
@@ -335,7 +336,7 @@ export default {
           //On Books, Food and Medical items there is no sales tax. So adding non-imported & sales tax excempted items.
 
           //Here we have salesTax = 0 in our object because item is from excempted category.
-          this.itemsSalesTax.push({ "title": item.title, "salesTax": 0, "priceInclAllTaxes": (parseFloat(item.price)).toFixed(2) })
+          this.itemsSalesTax.push({ "title": item.title, "salesTax": 0, "priceInclAllTaxes": (parseFloat(item.price)).toFixed(2),'imported':false })
 
           // Adding price of item to exisitng total. Initially the total is zero.
           this.total = parseFloat(this.total) + parseFloat(item.price)
@@ -354,21 +355,22 @@ export default {
           priceInclTax = priceInclTax.toFixed(2)
           
           // Now the object with all the required details is pushed in array of items which has tax calculation too.
-          this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)).toFixed(2), "priceInclAllTaxes": priceInclTax })
+          this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)).toFixed(2), "priceInclAllTaxes": priceInclTax,'imported':false })
           this.total = parseFloat(this.total) + (parseFloat(item.price) + parseFloat(salesTax))
           this.total = this.total.toFixed(2)
 
           // In the first condition there was no sales tax but now there is a sales tax and we will add it to total salesTax collected on current totalSales Tax.
           // Initially the totalSalesTax is zero.
-          this.totalSalesTax = this.totalSalesTax + salesTax
+          this.totalSalesTax = parseFloat(this.totalSalesTax) + parseFloat(salesTax);
+          this.totalSalesTax = (this.totalSalesTax).toFixed(2)
         }
         // Third condition is for those items which are imported. Now Sales tax will also apply for this item.
         if (item.imported_quantity !== 0 && this.importedPrice !== 0) {
 
           //Here we will get the Import Tax percentage on imported item price.
           let importTax = this.percentageCalculator(this.importedTaxPercnt, parseFloat(item.importedPrice))
-          let salesTax = 0.00;  // For sales tax excemption the applied sales tax will always be zero.
-          let priceInclTax = 0.00;
+          let salesTax = 0;  // For sales tax excemption the applied sales tax will always be zero.
+          let priceInclTax = 0;
 
           // Here there will be 2 conditions extra to check whether the imported item is in the category of sales tax excemption or not.
 
@@ -379,30 +381,31 @@ export default {
             priceInclTax = parseFloat(item.importedPrice) + parseFloat(importTax);
             priceInclTax = priceInclTax
 
-            this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)), "priceInclAllTaxes": priceInclTax })
+            this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)), "priceInclAllTaxes": priceInclTax, 'imported':true })
             this.total = parseFloat(this.total) + (parseFloat(item.importedPrice) + parseFloat(importTax))
             this.total = this.total.toFixed(2)
-            this.totalSalesTax = this.totalSalesTax + salesTax.toFixed(2);
+            this.totalSalesTax = parseFloat(this.totalSalesTax) + parseFloat(importTax)
+            this.totalSalesTax = (this.totalSalesTax).toFixed(2);
           }
           // Second condition is for imported item is not under sales tax excemption.
           else {
             
             //Since we already have the calcualtion of import tax above so now we will add the sales tax on imported item price.
             salesTax = this.percentageCalculator(this.basicSalesTaxPercnt, parseFloat(item.importedPrice))
-
             // Here the import price is added with import tax and sales tax to get a price including all tax on this item.
             priceInclTax = parseFloat(item.importedPrice) + parseFloat(importTax) + parseFloat(salesTax);
             priceInclTax = priceInclTax
-            this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)), "priceInclAllTaxes": priceInclTax })
+            this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)), "priceInclAllTaxes": priceInclTax,'imported':true  })
 
             // Here we are adding previous total and  imported price with sales tax and import tax.
             this.total = parseFloat(this.total) + (parseFloat(item.importedPrice) + parseFloat(importTax) + parseFloat(salesTax))
             this.total = this.total.toFixed(2)
-            this.totalSalesTax = this.totalSalesTax + salesTax.toFixed(2);
+            this.totalSalesTax = parseFloat(this.totalSalesTax) + parseFloat(salesTax)+ parseFloat(importTax);   
+            this.totalSalesTax = (this.totalSalesTax).toFixed(2)          
+            
           }
         }
       });
-
     },
     // This fuction is used to get sales tax on price and import tax on price whenever required.
     percentageCalculator(percent, price) {
@@ -418,8 +421,16 @@ export default {
       // Here we take second decimal digit.
       let second_decimalNumber = factor[1]                // number = 6
 
-      // First condition is checking whether second digit is greated than 0 & 5.
-      if (second_decimalNumber > 5 && second_decimalNumber > 0) {
+      // First condition is if first digit after decimal is 9 and second digit is greated than 5 so we will round of digital before decimal by adding a 1.
+      if(first_decimalNumber === 9 && second_decimalNumber > 5)
+      {
+        result = (result + "").split(".")[0];  // For Example: 1.98 => 1
+        result = result + 1                    //                   => 1+1=2 
+        result = result + '.00'                //                   => 2.00
+      }
+
+      // Second condition is checking whether second digit is greated than 0 & 5.
+      else if (second_decimalNumber > 5 && second_decimalNumber > 0) {
 
         //Rounding off the first decimal digit based on second decimal digit.  For Example => .68 => .70
         let newFactor = (parseInt(first_decimalNumber) + 1).toString() + '0'
@@ -434,7 +445,7 @@ export default {
         result = result + "." + roundedDecimals;   
       }
 
-      // Second condition checks if second decimal is less and 5 and greated than 0
+      // First condition checks if second decimal is less and 5 and greated than 0
       else if (second_decimalNumber < 5 && second_decimalNumber > 0) {
 
         // Here we just round off the second digit to neared zero. For Example: .64 => .60
@@ -445,15 +456,6 @@ export default {
         result = (result + "").split(".")[0];
         result = result + "." + roundedDecimals;
       }
-
-      // There will be a third condition also 
-      /*if(first_decimalNumber === 9 && second_decimalNumber > 5)
-      {
-        result = (result + "").split(".")[0];  // For Example: 1.98 => 1
-        result = result + 1                    //                   => 1+1=2 
-        result = result + '.00'                //                   => 2.00
-      }*/
-     
       return result;
     },
 
