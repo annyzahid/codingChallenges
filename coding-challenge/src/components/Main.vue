@@ -326,78 +326,138 @@ export default {
       totalItems.push(this.perfume);
       totalItems.push(this.headachePills);
 
+      // Note: parseFloat is basically converting/casting string to float value. Why string initally because it's comming from HTML. toFixed(2) is taking 2 digits after decimal.
       totalItems.forEach(item => {
 
-
+        // First condition is checking whether the added item is in tax-excemptions array & price and quantity is not zero. 
+        // First condition is only for non-imported items.
         if (item.local_quantity > 0 && this.taxExcemptions.includes(item.type) && item.price > 0) {
-          //On Books, Food and Medical items there is no sales tax. So we will just add price in existing total.
+          //On Books, Food and Medical items there is no sales tax. So adding non-imported & sales tax excempted items.
+
+          //Here we have salesTax = 0 in our object because item is from excempted category.
           this.itemsSalesTax.push({ "title": item.title, "salesTax": 0, "priceInclAllTaxes": (parseFloat(item.price)).toFixed(2) })
+
+          // Adding price of item to exisitng total. Initially the total is zero.
           this.total = parseFloat(this.total) + parseFloat(item.price)
           this.total = this.total.toFixed(2)
         }
 
+        // Second condition is also for non-imported item but this time the item is not in tax excemption array.
         if (item.local_quantity > 0 && !this.taxExcemptions.includes(item.type) && item.price > 0) {
-          //Adding sales tax on non-imported & non-excempted items. 
+
+          //Adding sales tax on non-imported & non-excempted items. Getting rounded nearest percentage calculation of price.
+          // Sales tax percentage and price is passed to funtion.
           let salesTax = this.percentageCalculator(this.basicSalesTaxPercnt, parseFloat(item.price))
+
+          // Here the Tax included price is summed up.
           let priceInclTax = parseFloat(item.price) + parseFloat(salesTax);
           priceInclTax = priceInclTax.toFixed(2)
+          
+          // Now the object with all the required details is pushed in array of items which has tax calculation too.
           this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)).toFixed(2), "priceInclAllTaxes": priceInclTax })
           this.total = parseFloat(this.total) + (parseFloat(item.price) + parseFloat(salesTax))
           this.total = this.total.toFixed(2)
+
+          // In the first condition there was no sales tax but now there is a sales tax and we will add it to total salesTax collected on current totalSales Tax.
+          // Initially the totalSalesTax is zero.
           this.totalSalesTax = this.totalSalesTax + salesTax
         }
-        //Adding imported tax on imported items
+        // Third condition is for those items which are imported. Now Sales tax will also apply for this item.
         if (item.imported_quantity !== 0 && this.importedPrice !== 0) {
+
+          //Here we will get the Import Tax percentage on imported item price.
           let importTax = this.percentageCalculator(this.importedTaxPercnt, parseFloat(item.importedPrice))
-          let salesTax = 0.00;
+          let salesTax = 0.00;  // For sales tax excemption the applied sales tax will always be zero.
           let priceInclTax = 0.00;
+
+          // Here there will be 2 conditions extra to check whether the imported item is in the category of sales tax excemption or not.
+
+          // First condition is for checking that imported item is in tax excemption or not.
           if (this.taxExcemptions.includes(item.type)) {
+
+            // Here we are adding only the import tax to imported item price.
             priceInclTax = parseFloat(item.importedPrice) + parseFloat(importTax);
             priceInclTax = priceInclTax
+
             this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)), "priceInclAllTaxes": priceInclTax })
             this.total = parseFloat(this.total) + (parseFloat(item.importedPrice) + parseFloat(importTax))
             this.total = this.total.toFixed(2)
             this.totalSalesTax = this.totalSalesTax + salesTax.toFixed(2);
           }
+          // Second condition is for imported item is not under sales tax excemption.
           else {
+            
+            //Since we already have the calcualtion of import tax above so now we will add the sales tax on imported item price.
             salesTax = this.percentageCalculator(this.basicSalesTaxPercnt, parseFloat(item.importedPrice))
+
+            // Here the import price is added with import tax and sales tax to get a price including all tax on this item.
             priceInclTax = parseFloat(item.importedPrice) + parseFloat(importTax) + parseFloat(salesTax);
             priceInclTax = priceInclTax
             this.itemsSalesTax.push({ "title": item.title, "salesTax": (parseFloat(salesTax)), "priceInclAllTaxes": priceInclTax })
+
+            // Here we are adding previous total and  imported price with sales tax and import tax.
             this.total = parseFloat(this.total) + (parseFloat(item.importedPrice) + parseFloat(importTax) + parseFloat(salesTax))
             this.total = this.total.toFixed(2)
             this.totalSalesTax = this.totalSalesTax + salesTax.toFixed(2);
           }
-          
-
         }
       });
 
     },
+    // This fuction is used to get sales tax on price and import tax on price whenever required.
     percentageCalculator(percent, price) {
-      //Function to return percentage of a number with a rounded off figure with 2 decimals.
-      let result = parseFloat((percent / 100) * price);   //for example: Number = 0.565
-      console.log(result)
+      //First we will use simple maths to calculate percentage of a number (price).
+      let result = parseFloat((percent / 100) * price);   //for example: Number = 0.56532
+
+      // We split the digits after decimal.
       let factor = (result + "").split(".")[1];             // number = 565
-      let first_decimalNumber = factor[0]                 // 5
-      let second_decimalNumber = factor[1]                // 6
+      
+      // Here we take first decimal digit.
+      let first_decimalNumber = factor[0]                 // number = 5
+      
+      // Here we take second decimal digit.
+      let second_decimalNumber = factor[1]                // number = 6
+
+      // First condition is checking whether second digit is greated than 0 & 5.
       if (second_decimalNumber > 5 && second_decimalNumber > 0) {
+
+        //Rounding off the first decimal digit based on second decimal digit.  For Example => .68 => .70
         let newFactor = (parseInt(first_decimalNumber) + 1).toString() + '0'
-        let roundedDecimals = newFactor[0] + newFactor[1];
+
+        // Now the new after decimal digitals are joined. For Example '7' + '0'  as a string (not as a number)
+        let roundedDecimals = newFactor[0] + newFactor[1];  
+        
+        // Now we remove the after decimal part from orignal result. For Example: '0.68' => '0'
         result = (result + "").split(".")[0];
+
+        // We add the rounded of decimals with the result as a string. For Example: '0' +  '.' + '70' = 0.70
         result = result + "." + roundedDecimals;   
       }
 
+      // Second condition checks if second decimal is less and 5 and greated than 0
       else if (second_decimalNumber < 5 && second_decimalNumber > 0) {
+
+        // Here we just round off the second digit to neared zero. For Example: .64 => .60
         let newFactor = second_decimalNumber + 0
+
+        // Here the first and second(modified) digits are added togther as a string.
         let roundedDecimals = newFactor[0] + newFactor[1];
         result = (result + "").split(".")[0];
         result = result + "." + roundedDecimals;
       }
+
+      // There will be a third condition also 
+      /*if(first_decimalNumber === 9 && second_decimalNumber > 5)
+      {
+        result = (result + "").split(".")[0];  // For Example: 1.98 => 1
+        result = result + 1                    //                   => 1+1=2 
+        result = result + '.00'                //                   => 2.00
+      }*/
      
       return result;
     },
 
+    // This Function is to reset all values to its orignal state. It's totally vue.js trick.
     clearAll() {
       Object.assign(this.$data, this.$options.data?.call(this));
     }
